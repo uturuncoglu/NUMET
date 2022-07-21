@@ -79,7 +79,7 @@ module numetDriver
       return  ! bail out
 
     ! determine the generic component labels
-    componentCount = ESMF_ConfigGetLen(config, label="UMS_component_list:", &
+    componentCount = ESMF_ConfigGetLen(config, label="NUMET_component_list:", &
       rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
@@ -87,7 +87,7 @@ module numetDriver
       return  ! bail out
     allocate(compLabels(componentCount))
     call ESMF_ConfigGetAttribute(config, valueList=compLabels, &
-      label="UMS_component_list:", count=componentCount, rc=rc)
+      label="NUMET_component_list:", count=componentCount, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__, &
       file=__FILE__)) &
@@ -314,7 +314,7 @@ program numetApp
     call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
   call ESMF_ConfigGetAttribute(config, logFlush, &
-    label="UMS_log_flush:", default=.false., rc=rc)
+    label="NUMET_log_flush:", default=.false., rc=rc)
   if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
     line=__LINE__, &
     file=__FILE__)) &
@@ -332,7 +332,7 @@ program numetApp
     call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
   call ESMF_ConfigGetAttribute(config, fieldDictionary, &
-    label="UMS_field_dictionary:", default="<no-set>", rc=rc)
+    label="NUMET_field_dictionary:", default="<no-set>", rc=rc)
   if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
     line=__LINE__, &
     file=__FILE__)) &
@@ -366,7 +366,7 @@ program numetApp
     call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
   ! read and ingest free format driver attributes
-  ff = NUOPC_FreeFormatCreate(config, label="UMS_attributes::", &
+  ff = NUOPC_FreeFormatCreate(config, label="NUMET_attributes::", &
     relaxedflag=.true., rc=rc)
   if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
     line=__LINE__, &
