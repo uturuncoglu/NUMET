@@ -13,6 +13,23 @@ The objectives of NUMET are:
 The approach of NUMET is to provide a software component that can be pulled into any modeling system as a Git submodule from GitHub. Next to NUMET sit the NUOPC-based model components as usual. The modeling system itself provides the build- and run-time configuration files.
 
 The concrete pieces maintained in and supplied by the NUMET repo are:
- - An implementation of the top level application and driver that is fully configurable at build- and/or run-time via the nuBuild.yaml and nuRun.config files, respectively.
- - A CMake-based build system that is based on the same nuBuild.yaml configuration information.
+ - An implementation of the top level application and driver that is fully configurable at build- and run-time via the nuBuild.yaml and nuRun.config files, respectively.
+ - A CMake-based build system that uses the same nuBuild.yaml file to ochestrate the complete build procedure.
  - Run configuration management that is built on a self-describing component standard.
+
+## Adding NUMET to a project
+A project that wants to use NUMET first sets up NUMET as a Git submodule:
+
+    git submodule add https://github.com:theurich/NUMET
+    
+## nuBuild.yaml
+Next a suitable nuBuild.yaml file need to be composed. It's a yaml file with a very simple format:
+
+    components:
+      
+      fv3:
+         source_dir:   ./FV3
+         shared:       false
+         fort_module:  fv3atm
+
+
