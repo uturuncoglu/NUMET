@@ -9,11 +9,19 @@ module numetDriver
   use NUOPC
   use NUOPC_Driver,             driverSS    => SetServices
 
+  include "compUse.inc"
+
   implicit none
 
   private
 
-  public SetServices
+  public SetServices, SetVM
+
+  type type_CompDef
+    procedure(SetServices), pointer, nopass :: ssPtr => null()
+    procedure(SetVM),       pointer, nopass :: svPtr => null()
+    character(ESMF_MAXSTR)                  :: name = "__uninitialized__"
+  end type
 
   !-----------------------------------------------------------------------------
   contains
@@ -60,7 +68,7 @@ module numetDriver
     type(ESMF_Time)                 :: startTime, stopTime
     type(ESMF_TimeInterval)         :: timeStep
     type(ESMF_Clock)                :: internalClock
-    integer                         :: i, componentCount, ompNumThreads
+    integer                         :: i, j, componentCount, ompNumThreads
     integer, allocatable            :: petList(:)
     type(ESMF_GridComp)             :: comp
     type(ESMF_Config)               :: config
@@ -68,8 +76,10 @@ module numetDriver
     character(len=32), allocatable  :: compLabels(:)
     character(len=32)               :: prefix
     integer                         :: petListBounds(2)
-    character(len=240)              :: sharedObject
+    character(len=240)              :: model
     type(ESMF_Info)                 :: info
+    type(type_CompDef), allocatable :: CompDef(:)
+    logical                         :: inCompDef
 
     ! get the config
     call ESMF_GridCompGet(driver, config=config, rc=rc)
@@ -93,6 +103,10 @@ module numetDriver
       file=__FILE__)) &
       return  ! bail out
 
+    ! setup CompDef structure
+    allocate(CompDef(componentCount))
+    include "compDef.inc"
+
     ! determine information for each component and add to the driver
     do i=1, componentCount
       ! construct component prefix
@@ -106,8 +120,8 @@ module numetDriver
         file=__FILE__)) &
         return  ! bail out
       call NUOPC_IngestPetList(petList, ff, rc=rc)
-      call ESMF_ConfigGetAttribute(config, sharedObject, &
-        label=trim(prefix)//"_shared_object:", rc=rc)
+      call ESMF_ConfigGetAttribute(config, model, &
+        label=trim(prefix)//"_model:", rc=rc)
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
         line=__LINE__, &
         file=__FILE__)) &
@@ -134,16 +148,39 @@ module numetDriver
           return  ! bail out
       endif
 
-      ! add child component with SetVM and SetServices in shared object
-      call NUOPC_DriverAddComp(driver, trim(prefix), &
-        sharedObj=trim(sharedObject), info=info, petList=petList, comp=comp, &
-        rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, &
-        msg="Unable to add component '"//trim(prefix)// &
-          "' to driver via shared object: "//trim(sharedObject), &
-        line=__LINE__, &
-        file=__FILE__)) &
-        return  ! bail out
+      ! see whether there is an entry for this component inside CompDef
+      inCompDef = .false.
+      do j=1, componentCount
+        if (trim(CompDef(j)%name)=="__uninitialized__") exit
+        if (trim(CompDef(j)%name)==trim(model)) then
+          inCompDef = .true.
+          exit
+        endif
+      enddo
+
+      if (inCompDef) then
+        ! add child component with SetVM and SetServices in CompDef
+        call NUOPC_DriverAddComp(driver, trim(prefix), config=config, &
+          compSetServicesRoutine=CompDef(j)%ssPtr, compSetVMRoutine=CompDef(j)%svPtr, &
+          info=info, petList=petList, comp=comp, rc=rc)
+        if (ESMF_LogFoundError(rcToCheck=rc, &
+          msg="Unable to add component '"//trim(prefix)// &
+            "' to driver via Fortran module.", &
+          line=__LINE__, &
+          file=__FILE__)) &
+          return  ! bail out
+      else
+        ! add child component with SetVM and SetServices in shared object
+        call NUOPC_DriverAddComp(driver, trim(prefix), config=config, &
+          sharedObj=trim(model), info=info, petList=petList, comp=comp, &
+          rc=rc)
+        if (ESMF_LogFoundError(rcToCheck=rc, &
+          msg="Unable to add component '"//trim(prefix)// &
+            "' to driver via shared object: "//trim(model), &
+          line=__LINE__, &
+          file=__FILE__)) &
+          return  ! bail out
+      endif
 
       ! read and ingest free format component attributes
       ff = NUOPC_FreeFormatCreate(config, &
