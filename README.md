@@ -17,19 +17,79 @@ The concrete pieces maintained in and supplied by the NUMET repo are:
  - A CMake-based build system that uses the same nuBuild.yaml file to ochestrate the complete build procedure.
  - Run configuration management that is built on a self-describing component standard.
 
+## The NumetProto example
+Refer to [NumetProto](https://github.com/esmf-org/nuopc-app-prototypes/tree/develop/NumetProto) as a NUOPC prototype example that demponstrates the usage of NUMET.
+
 ## Adding NUMET to a project
-A project that wants to use NUMET first sets up NUMET as a Git submodule:
+A project that wants to use NUMET sets up NUMET as a Git submodule:
 
     git submodule add https://github.com:theurich/NUMET
     
 ## nuBuild.yaml
-Next a suitable nuBuild.yaml file need to be composed. It's a yaml file with a very simple format:
+A suitable nuBuild.yaml file need to be composed. It's a yaml file with a very simple format:
 
     components:
-      
-      fv3:
-         source_dir:   ./FV3
-         shared:       false
-         fort_module:  fv3atm
 
+      tawas:
+        source_dir:   ./TAWAS
+        shared:       true
 
+      lumo:
+        source_dir:   ./LUMO
+        shared:       false
+        fort_module:  lumo
+
+In this example, two components are specified: tawas and lumo. The source code of the first compoennt is located in the ./TAWAS directory uder the project directory, It is configured to be built as a shared library. Further, since there is no Fortran module name specified via fort_module, this component will not create a build dependency for the NUMET executable. Instead the componet becomes available to be loaded at run-time. The nuRun.config section will provide further details.
+
+The second component in the example, lumo, on the other hand does specify the fort_module key. It will be built into the NEMET executable by accessing the Fortran module at build-time, and linking against the lumet library.
+
+## Building the NUMET executable
+With the NUMET submodule and the nuBuild.yaml file in place, the NUMET executable can be built. This is accomplished by the following build procedure, starting at the root of the project directory:
+
+    mkdir build
+    cd build
+    cmake ../NUMET
+    cmake --build .
+
+A successful build produces the numet.exe in the build directory. Shared object libraries, e.g. here for the TAWAS component, are located under their respective subdirectories.
+
+## nuRun.config
+The nuRun.config file needs to be located under the run directory from where the NUMET executable is launched. It is read by the NUMET executable during startup. This configuration file specifies a few global ESMF and NUMET level settings, the list of components used during this run, details about the components, and run sequence details.
+
+    logKindFlag:            ESMF_LOGKIND_MULTI
+    globalResourceControl:  .true.
+    
+    NUMET_log_flush:        .true.
+    NUMET_field_dictionary: ./fd.yaml
+
+    NUMET_component_list:   ATM OCN
+    NUMET_attributes::
+      Verbosity = high
+    ::
+    
+    ATM_model:            ../build/TAWAS/libtawas.so
+    ATM_petlist:          0-3
+    ATM_omp_num_threads:  1
+    ATM_ttributes::
+      Verbosity = high
+    ::
+    
+    OCN_model:            lumo
+    OCN_petlist:          1 3
+    OCN_attributes::
+      Verbosity = high
+    ::
+    
+    startTime:  2012-10-24T18:00:00
+    stopTime:   2012-10-24T19:00:00
+    
+    runSeq::
+      @900
+        ATM -> OCN
+        OCN -> ATM
+        ATM
+        OCN
+      @
+    ::
+
+There are two options under the XXX_model: field. First the value is used to search whether a build-time dependency exsits with the same name. If so, the respective component, which was accessed via its Fortran module at build time, is selected to execute. Second, if the value does not match a build-time dependency, it is assumed to correspond to a shared object, and the attempt is made to access the object at run-time.
